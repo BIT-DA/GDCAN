@@ -1,0 +1,6 @@
+pytorch==1.2.0
+torchvision == 0.2.2
+Pillow==6.2.0
+tensorboardX==2.0
+munch==2.5.0
+numpy==1.18.5
