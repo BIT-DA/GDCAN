@@ -18,7 +18,7 @@ from tensorboardX import SummaryWriter
 from loss import EntropyLoss, MMD, MMD_reg
 from data_list import ImageList
 from logger import Logger
-from network import se_resnet101, se_resnet50, se_resnet152
+from network import dcca_resnet101, dcca_resnet50, dcca_resnet152
 
 import torch.backends.cudnn as cudnn
 
@@ -130,9 +130,9 @@ def train(config):
     class_num = config['network']['params']['class_num']
     net_config = config['network']
     if net_config['name'] == '50':
-        base_network = se_resnet50()
+        base_network = dcca_resnet50()
     elif net_config['name'] == '101':
-        base_network = se_resnet101()
+        base_network = dcca_resnet101()
     else:
         raise ValueError('base network %s not found!' % (net_config['name']))
     classifier_layer = nn.Linear(2048, class_num)
