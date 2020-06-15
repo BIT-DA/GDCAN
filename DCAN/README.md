@@ -11,17 +11,17 @@ To install the required python packages, run
 ## Training
 [Office-Home](http://hemanthdv.org/OfficeHome-Dataset/)
 ```
-python3 train_dcan.py --gpu_id id --net 50 --output_path snapshot/ --data_set home --source_path data/list/home/Art_65.txt --target_path data/list/home/Clipart_65.txt --test_path data/list/home/Clipart_65.txt
-```
-
-[Office-31](https://people.eecs.berkeley.edu/~jhoffman/domainadapt/)
-```
-python3 train_dcan.py --gpu_id id --net 50 --output_path snapshot/ --data_set office --source_path data/list/office/amazon_31.txt --target_path data/list/office/webcam_31.txt --test_path data/list/office/webcam_31.txt
+python train_dcan.py --gpu_id id --net 50 --output_path snapshot/ --data_set home --source_path data/list/home/Art_65.txt --target_path data/list/home/Clipart_65.txt --test_path data/list/home/Clipart_65.txt
 ```
 
 [DomainNet](http://ai.bu.edu/M3SDA/)
 ```
-python3 train_dcan.py --gpu_id id --net 50/101/152 --output_path snapshot/ --dset domainnet --source_path /data/list/domainnet/clipart_train.txt --target_path data/list/domainnet/infograph_train.txt --test_path data/list/domainnet/infograph_test.txt
+python train_dcan.py --gpu_id id --net 50/101/152 --output_path snapshot/ --data_set domainnet --source_path /data/list/domainnet/clipart_train.txt --target_path data/list/domainnet/infograph_train.txt --test_path data/list/domainnet/infograph_test.txt
+```
+
+[Office-31](https://people.eecs.berkeley.edu/~jhoffman/domainadapt/)
+```
+python train_dcan.py --gpu_id id --net 50 --output_path snapshot/ --data_set office --source_path data/list/office/amazon_31.txt --target_path data/list/office/webcam_31.txt --test_path data/list/office/webcam_31.txt
 ```
 
 ## Acknowledgement

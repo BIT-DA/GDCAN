@@ -7,77 +7,27 @@ from __future__ import print_function, division, absolute_import
 from collections import OrderedDict
 import torch
 import torch.nn as nn
-import pretrainedmodels
 from torchvision import models
 
-__all__ = ['SENet', 'se_resnet50', 'se_resnet101']
+__all__ = ['DCCANet', 'dcca_resnet50', 'dcca_resnet101', 'dcca_resnet152']
 
 pretrained_settings = {
-    'se_resnet50': {
+    'dcca_resnet50': {
         'imagenet': {
-            'url': 'http://data.lip6.fr/cadene/pretrainedmodels/se_resnet50-ce0d4300.pth',
-            'input_space': 'RGB',
-            'input_size': [3, 224, 224],
-            'input_range': [0, 1],
-            'mean': [0.485, 0.456, 0.406],
-            'std': [0.229, 0.224, 0.225],
-            'num_classes': 1000
+            'RESTORE_FROM': 'pretrained_models/dcca_resnet50_pretrained_imagenet.pth'
         }
     },
-    'se_resnet101': {
+    'dcca_resnet101': {
         'imagenet': {
-            'url': 'http://data.lip6.fr/cadene/pretrainedmodels/se_resnet101-7e38fcc6.pth',
-            'input_space': 'RGB',
-            'input_size': [3, 224, 224],
-            'input_range': [0, 1],
-            'mean': [0.485, 0.456, 0.406],
-            'std': [0.229, 0.224, 0.225],
-            'num_classes': 1000
+            'RESTORE_FROM': 'pretrained_models/dcca_resnet101_pretrained_imagenet.pth'
         }
     },
-    'se_resnet152': {
+    'dcca_resnet152': {
         'imagenet': {
-            'url': 'http://data.lip6.fr/cadene/pretrainedmodels/se_resnet152-d17c99b7.pth',
-            'input_space': 'RGB',
-            'input_size': [3, 224, 224],
-            'input_range': [0, 1],
-            'mean': [0.485, 0.456, 0.406],
-            'std': [0.229, 0.224, 0.225],
-            'num_classes': 1000
+            'RESTORE_FROM': 'pretrained_models/dcca_resnet152_pretrained_imagenet.pth'
         }
     },
 }
-
-
-class SEModule(nn.Module):
-
-    def __init__(self, channels, reduction):
-        super(SEModule, self).__init__()
-        self.avg_pool = nn.AdaptiveAvgPool2d(1)
-        self.fc0 = nn.Conv2d(channels, channels // reduction, kernel_size=1,
-                             padding=0)
-        self.fc1 = nn.Conv2d(channels, channels // reduction, kernel_size=1,
-                             padding=0)
-        self.relu = nn.ReLU(inplace=True)
-        self.fc2 = nn.Conv2d(channels // reduction, channels, kernel_size=1,
-                             padding=0)
-        self.sigmoid = nn.Sigmoid()
-
-    def forward(self, x):
-        module_input = x
-        x = self.avg_pool(x)
-        if self.training:
-            src = self.fc0(x[:int(x.size(0) / 2), ])
-            # src = self.fc1(x[:int(x.size(0) / 2), ])
-            trg = self.fc1(x[int(x.size(0) / 2):, ])
-            x = torch.cat((src, trg), 0)
-        else:
-            x = self.fc1(x)
-
-        x = self.relu(x)
-        x = self.fc2(x)
-        x = self.sigmoid(x)
-        return module_input * x
 
 
 class Bottleneck(nn.Module):
@@ -108,17 +58,47 @@ class Bottleneck(nn.Module):
         return out
 
 
-class SEResNetBottleneck(Bottleneck):
+class DCCAModule(nn.Module):
+
+    def __init__(self, channels, reduction):
+        super(DCCAModule, self).__init__()
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.fc0 = nn.Conv2d(channels, channels // reduction, kernel_size=1,
+                             padding=0)
+        self.fc1 = nn.Conv2d(channels, channels // reduction, kernel_size=1,
+                             padding=0)
+        self.relu = nn.ReLU(inplace=True)
+        self.fc2 = nn.Conv2d(channels // reduction, channels, kernel_size=1,
+                             padding=0)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        module_input = x
+        x = self.avg_pool(x)
+        if self.training:
+            src = self.fc0(x[:int(x.size(0) / 2), ])
+            # src = self.fc1(x[:int(x.size(0) / 2), ])
+            trg = self.fc1(x[int(x.size(0) / 2):, ])
+            x = torch.cat((src, trg), 0)
+        else:
+            x = self.fc1(x)
+
+        x = self.relu(x)
+        x = self.fc2(x)
+        x = self.sigmoid(x)
+        return module_input * x
+
+
+class DCCAResNetBottleneck(Bottleneck):
     """
-    ResNet bottleneck with a Squeeze-and-Excitation module. It follows Caffe
+    ResNet bottleneck with a Domain Conditioned Channel Attention module. It follows Caffe
     implementation and uses `stride=stride` in `conv1` and not in `conv2`
     (the latter is used in the torchvision implementation of ResNet).
     """
     expansion = 4
 
-    def __init__(self, inplanes, planes, groups, reduction, stride=1,
-                 downsample=None):
-        super(SEResNetBottleneck, self).__init__()
+    def __init__(self, inplanes, planes, groups, reduction, stride=1, downsample=None):
+        super(DCCAResNetBottleneck, self).__init__()
         self.conv1 = nn.Conv2d(inplanes, planes, kernel_size=1, bias=False,
                                stride=stride)
         self.bn1 = nn.BatchNorm2d(planes, track_running_stats=True)
@@ -128,17 +108,17 @@ class SEResNetBottleneck(Bottleneck):
         self.conv3 = nn.Conv2d(planes, planes * 4, kernel_size=1, bias=False)
         self.bn3 = nn.BatchNorm2d(planes * 4, track_running_stats=True)
         self.relu = nn.ReLU(inplace=True)
-        self.se_module = SEModule(planes * 4, reduction=reduction)
+        self.se_module = DCCAModule(planes * 4, reduction=reduction)
         self.downsample = downsample
         self.stride = stride
 
 
-class SENet(nn.Module):
+class DCCANet(nn.Module):
 
     def __init__(self, block, layers, groups, reduction, dropout_p=0.2,
                  inplanes=128, input_3x3=True, downsample_kernel_size=3,
                  downsample_padding=1):
-        super(SENet, self).__init__()
+        super(DCCANet, self).__init__()
         self.inplanes = inplanes
         if input_3x3:
             layer0_modules = [
@@ -244,113 +224,34 @@ class SENet(nn.Module):
         return x
 
 
-def initialize_pretrained_model(model, settings):
-    # assert num_classes == settings['num_classes'], \
-    #     'num_classes should be {}, but is {}'.format(
-    #         settings['num_classes'], num_classes)
-
-    # model.load_state_dict(model_zoo.load_url(settings['url']))
-    model.input_space = settings['input_space']
-    model.input_size = settings['input_size']
-    model.input_range = settings['input_range']
-    model.mean = settings['mean']
-    model.std = settings['std']
-
-
-def se_resnet50(pretrained='imagenet'):
-    model = SENet(SEResNetBottleneck, [3, 4, 6, 3], groups=1, reduction=16,
-                  dropout_p=None, inplanes=64, input_3x3=False,
-                  downsample_kernel_size=1, downsample_padding=0)
+def dcca_resnet50(pretrained='imagenet'):
+    model = DCCANet(DCCAResNetBottleneck, [3, 4, 6, 3], groups=1, reduction=16, dropout_p=None, inplanes=64,
+                    input_3x3=False, downsample_kernel_size=1, downsample_padding=0)
     if pretrained is not None:
-        settings = pretrained_settings['se_resnet50'][pretrained]
-        initialize_pretrained_model(model, settings)
+        settings = pretrained_settings['dcca_resnet50'][pretrained]
+        model.load_state_dict(torch.load(settings['RESTORE_FROM']))
 
-    pretrained_dict = pretrainedmodels.__dict__['se_resnet50'](num_classes=1000, pretrained='imagenet').state_dict()
-
-    model_dict = model.state_dict()
-    # filter out unnecessary keys
-    # pretrained_dict = {k: v for k, v in pretrained_dict.items()
-    #                    if k and k != 'last_linear.weight' and k != 'last_linear.bias' in model_dict}
-    # overwrite entries in the existing state dict
-    pretrained_dict = {k: v for k, v in pretrained_dict.items()
-                       if k in model_dict}
-    layer = [3, 4, 6, 3]
-    model_dict.update(pretrained_dict)
-    for i in range(1, 5):
-        for j in range(layer[i - 1]):
-            a1 = 'layer{}.{}.se_module.fc0.weight'.format(i, j)
-            a2 = 'layer{}.{}.se_module.fc0.bias'.format(i, j)
-            b1 = 'layer{}.{}.se_module.fc1.weight'.format(i, j)
-            b2 = 'layer{}.{}.se_module.fc1.bias'.format(i, j)
-            model_dict[a1] = pretrained_dict[b1]
-            model_dict[a2] = pretrained_dict[b2]
-    # load the new state dict
-    model.load_state_dict(model_dict)
     return model
 
 
-def se_resnet101(pretrained='imagenet'):
-    model = SENet(SEResNetBottleneck, [3, 4, 23, 3], groups=1, reduction=16,
-                  dropout_p=None, inplanes=64, input_3x3=False,
-                  downsample_kernel_size=1, downsample_padding=0)
+def dcca_resnet101(pretrained='imagenet'):
+    model = DCCANet(DCCAResNetBottleneck, [3, 4, 23, 3], groups=1, reduction=16, dropout_p=None,
+                    inplanes=64, input_3x3=False, downsample_kernel_size=1, downsample_padding=0)
     if pretrained is not None:
-        settings = pretrained_settings['se_resnet101'][pretrained]
-        initialize_pretrained_model(model, settings)
-
-    pretrained_dict = pretrainedmodels.__dict__['se_resnet101'](num_classes=1000, pretrained='imagenet').state_dict()
-
-    model_dict = model.state_dict()
-    # filter out unnecessary keys
-    # pretrained_dict = {k: v for k, v in pretrained_dict.items()
-    #                    if k and k != 'last_linear.weight' and k != 'last_linear.bias' in model_dict}
-    # overwrite entries in the existing state dict
-    pretrained_dict = {k: v for k, v in pretrained_dict.items()
-                       if k in model_dict}
-    layer = [3, 4, 23, 3]
-    model_dict.update(pretrained_dict)
-    for i in range(1, 5):
-        for j in range(layer[i - 1]):
-            a1 = 'layer{}.{}.se_module.fc0.weight'.format(i, j)
-            a2 = 'layer{}.{}.se_module.fc0.bias'.format(i, j)
-            b1 = 'layer{}.{}.se_module.fc1.weight'.format(i, j)
-            b2 = 'layer{}.{}.se_module.fc1.bias'.format(i, j)
-            model_dict[a1] = pretrained_dict[b1]
-            model_dict[a2] = pretrained_dict[b2]
-    # load the new state dict
-    model.load_state_dict(model_dict)
+        settings = pretrained_settings['dcca_resnet101'][pretrained]
+        model.load_state_dict(torch.load(settings['RESTORE_FROM']))
     return model
 
 
-def se_resnet152(pretrained='imagenet'):
-    model = SENet(SEResNetBottleneck, [3, 8, 36, 3], groups=1, reduction=16, dropout_p=None, inplanes=64,
-                  input_3x3=False, downsample_kernel_size=1, downsample_padding=0)
+def dcca_resnet152(pretrained='imagenet'):
+    model = DCCANet(DCCAResNetBottleneck, [3, 8, 36, 3], groups=1, reduction=16, dropout_p=None, inplanes=64,
+                    input_3x3=False, downsample_kernel_size=1, downsample_padding=0)
     if pretrained is not None:
-        settings = pretrained_settings['se_resnet152'][pretrained]
-        initialize_pretrained_model(model, settings)
+        settings = pretrained_settings['dcca_resnet152'][pretrained]
+        model.load_state_dict(torch.load(settings['RESTORE_FROM']))
 
-    pretrained_dict = pretrainedmodels.__dict__['se_resnet152'](num_classes=1000, pretrained='imagenet').state_dict()
-
-    model_dict = model.state_dict()
-    # filter out unnecessary keys
-    # pretrained_dict = {k: v for k, v in pretrained_dict.items()
-    #                    if k and k != 'last_linear.weight' and k != 'last_linear.bias' in model_dict}
-    # overwrite entries in the existing state dict
-    pretrained_dict = {k: v for k, v in pretrained_dict.items()
-                       if k in model_dict}
-    layer = [3, 8, 36, 3]
-    model_dict.update(pretrained_dict)
-    for i in range(1, 5):
-        for j in range(layer[i - 1]):
-            a1 = 'layer{}.{}.se_module.fc0.weight'.format(i, j)
-            a2 = 'layer{}.{}.se_module.fc0.bias'.format(i, j)
-            b1 = 'layer{}.{}.se_module.fc1.weight'.format(i, j)
-            b2 = 'layer{}.{}.se_module.fc1.bias'.format(i, j)
-            model_dict[a1] = pretrained_dict[b1]
-            model_dict[a2] = pretrained_dict[b2]
-    # load the new state dict
-    model.load_state_dict(model_dict)
-    new_modle_dic = model.state_dict()
     return model
+
 
 class ResNet50Fc(nn.Module):
     def __init__(self):
@@ -382,5 +283,4 @@ class ResNet50Fc(nn.Module):
 
     def output_num(self):
         return self.__in_features
-
 
