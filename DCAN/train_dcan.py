@@ -22,6 +22,7 @@ import torch.backends.cudnn as cudnn
 import warnings
 import torchvision
 from network import dcca_resnet50, dcca_resnet101
+from tqdm import tqdm
 
 cudnn.benchmark = True
 cudnn.deterministic = True
@@ -192,7 +193,7 @@ def train(config):
     len_train_target = len(dset_loaders['target'])
     best_acc = 0.0
     since = time.time()
-    for num_iter in range(config['max_iter']):
+    for num_iter in tqdm(range(config['max_iter'])):
         if num_iter % config['val_iter'] == 0 and num_iter != 0:
             base_network.train(False)
             classifier_layer.train(False)
