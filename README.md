@@ -1,7 +1,7 @@
 # Generalized Domain Conditioned Adaptation Network
-The Domain Conditioned Adaptation Network (DCAN) algorithm implemented in Pytorch.
-- (AAAI2020) [Domain Conditioned Adaptation Network](https://arxiv.org/abs/2005.06717)
-- (T-PAMI) [Generalized Domain Conditioned Adaptation Network](https://arxiv.org/abs/2103.12339)
+The GDCAN and DCAN algorithms implemented in Pytorch.
+- (AAAI2020 - DCAN) [Domain Conditioned Adaptation Network](https://arxiv.org/abs/2005.06717)
+- (T-PAMI - GDCAN) [Generalized Domain Conditioned Adaptation Network](https://arxiv.org/abs/2103.12339)
 
 
 ## Introduction
